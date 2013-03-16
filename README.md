@@ -1,10 +1,9 @@
 BenSearchEngine
-===============
+___
 
 Building a search engine from scratch.
 
-===============
-
+___
 benjamin.index
 
 This benjamin.index part is basically an index builder using merge sorting and compression tech. It has been tested in NZ2 and NZ.
@@ -46,7 +45,7 @@ I will explain it in 5 parts.
 6. find index from index file (search)
 	IndexFinder.java: give a word and it will return the [DocFrequency, [DocIDs], [Frequencies], [positions], [contexts]] of that word
 
-===============
+___
 
 benjamin.search
 
