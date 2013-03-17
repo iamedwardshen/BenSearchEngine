@@ -1,5 +1,5 @@
 /*
- * search query using reversed index with Document At A Time Query Processing and BM25
+ * search queries using reversed index with Document At A Time Query Processing and BM25
  */
 
 package benjamin.search;
@@ -11,9 +11,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
-import java.util.TreeMap;
+import java.util.Scanner;
 
 public class QuerySearch {
 	private static final int BUFFERSIZE = 20*1000*1000;
@@ -22,53 +24,63 @@ public class QuerySearch {
 	private ArrayList<Integer> docIDToTermSize;
 	private RandomAccessFile indexFile;
 	private double Daverage = 0;
+	private LinkedHashMap<String, int[]> searchCache;
 	
 	QuerySearch(){
+		//initialize beginEndOfWordInIndex, docIDToUrl files
 		initialize();
+		
+		//get file pointer
 		try{
 			this.indexFile = new RandomAccessFile("index", "r");
 		}catch(Exception e){
 			e.printStackTrace();
 		}
-		//compute Daverage
+		
+		//compute Daverage for BM25
 		for(int i = 0; i < docIDToTermSize.size(); i++) Daverage += docIDToTermSize.get(i);
 		Daverage = Daverage / docIDToTermSize.size();
+		//initiate cache
+		searchCache = new LinkedHashMap<>();
 	}
 	
-	public TreeMap<Double, String> getTop10PagesInBM25(String[] queries){
+	//get the top10 BM25 values of disjunctive queries
+	public BM25_URL_pair[] getTopKPagesInBM25(String[] queries, int number){
 		if(queries == null) return null;
+		if(number < 0) number = 0;
 		
-		TreeMap<Double, String> result = new TreeMap<>();
-		PriorityQueue<BM25_URL_pair> heap= new PriorityQueue<>(10,
+		//use heap to get top 10 BM25
+		PriorityQueue<BM25_URL_pair> heap= new PriorityQueue<>((number == 0? 1 : number),
 				new Comparator<BM25_URL_pair>(){
 			public int compare(BM25_URL_pair a, BM25_URL_pair b){
 				return Double.valueOf(a.getBM25()).compareTo(Double.valueOf(b.getBM25()));
 			}
 		});
 		IndexNode[] indexNodes = new IndexNode[queries.length];
-		for(int i = 0; i < queries.length; i++){
-			indexNodes[i] = new IndexNode();
-			indexNodes[i].setIndex(getBM25InfoOfWordIndex(queries[i]), this.docIDToUrl.size());
-		}
 		
-		//System.out.println(indexNodes[0].getDocFrequency());
-		//System.out.println(Arrays.toString(indexNodes[0].getDocIDs()));
-		//System.out.println(docIDToUrl.size());
+		//generate indexes for queries for Document At A Time Query Processing using
+		for(int i = 0; i < queries.length; i++){
+			indexNodes[i] = new IndexNode(
+					getBM25InfoOfWordIndex(queries[i]), this.docIDToUrl.size());
+		}
+
+		//Document At A Time Query Processing
 		int currentDocID = 0;
 		while(currentDocID < docIDToUrl.size()){
 			//get next docID in first index
 			currentDocID = indexNodes[0].nextBiggerOrEqualInt(currentDocID);
 			if(currentDocID >= docIDToUrl.size()) break;
-			//System.out.println(currentDocID);
 			
 			//see if you find the same docID in other indexes
 			int now = currentDocID;
 			for(int i = 1; i < indexNodes.length && 
 					(now = indexNodes[i].nextBiggerOrEqualInt(currentDocID)) == currentDocID;
 					i++);
+			
 			if(now > currentDocID) currentDocID = now;
 			else if(now == currentDocID){
 				//currentDocID is in intersection
+				
 				//compute BM25
 				
 				//get docFrequency
@@ -93,23 +105,26 @@ public class QuerySearch {
 					BM25Sum += log * ((k1 + 1) * Fdt[i]) / (k + Fdt[i]);
 				}
 				
-				if(heap.size() >= 10) heap.poll();
+				if(number != 0 && heap.size() >= number) heap.poll();
 				heap.offer(new BM25_URL_pair(BM25Sum, docIDToUrl.get(currentDocID)));
 				
 				currentDocID++;
 			}
 		}
 		
-		BM25_URL_pair pair;
-		while((pair = heap.poll()) != null){
-			result.put(pair.getBM25(), pair.getUrl());
+		BM25_URL_pair[] result = new BM25_URL_pair[heap.size()];
+		for(int i = 0; i< result.length; i++){
+			result[result.length - 1 - i] = heap.poll();
 		}
 		return result;
 	}
 	
 	//get [docFrequency, docIDs, frequencies]
 	private int[] getBM25InfoOfWordIndex(String word){
+		//search word list
 		if(!beginEndOfwordInIndex.containsKey(word)) return null;
+		//search cache
+		if(this.searchCache.containsKey(word)) return this.searchCache.get(word);
 		
 		long[] beginEnd = beginEndOfwordInIndex.get(word);
 		int docFrequency = (int) beginEnd[2];
@@ -142,6 +157,13 @@ public class QuerySearch {
 		for(int i = 0; i < docFrequency; i++)
 			result[1 + docFrequency + i] = readBuff.readNextInt();
 		
+		//sotre cache
+		if(this.searchCache.size() >= 100){
+			Iterator<Entry<String, int[]>> iterater= this.searchCache.entrySet().iterator();
+			Entry<String, int[]> first = iterater.next();
+			this.searchCache.remove(first);
+		}
+		this.searchCache.put(word, result);
 		return result;
 	}
 	
@@ -255,24 +277,38 @@ public class QuerySearch {
 	
 	public static void main(String[] args){
 		
-		QuerySearch indexFinder = new QuerySearch();
+		QuerySearch querySearch = new QuerySearch();
+
 		//[docFrequency, docIDs, frequencies, positions, contexts]
-		Date begin = new Date();
 		//int[] a = indexFinder.getBM25InfoOfWordIndex("car");
-		//System.out.println(a.size());
+		//System.out.println(a.length);
 		
-		String[] queary = {"porn", "girl", "sex"};
-		TreeMap<Double, String> result = indexFinder.getTop10PagesInBM25(queary);
-		for(Entry<Double, String> entry : result.entrySet()){
-			System.out.println(entry);
+		Scanner scanner = new Scanner(System.in);
+		while(true){
+			System.out.print("type queries: ");
+			String[] queary = {"bridge", "travel", "map"};
+			//get queries
+			queary = scanner.nextLine().split(" ");
+			
+			Date begin = new Date();
+			//get the top k url with BM25
+			BM25_URL_pair[] result = querySearch.getTopKPagesInBM25(queary, 10);
+			Date end = new Date();
+			
+			//out put urls
+			for(BM25_URL_pair pair : result){
+				System.out.println(pair);
+			}
+			
+			//used time
+			System.out.println("used " + (end.getTime() - begin.getTime()) + " milliseconds");
 		}
 		
-		Date end = new Date();
-		System.out.println("used " + (end.getTime() - begin.getTime()) + " milliseconds");
 
 	}
 }
 
+//read buffer for variable-byte compressed index
 class ReadBuff{
 	private byte[] buf;
 	private int pos;
@@ -309,7 +345,7 @@ class IndexNode{
 	private int pos;
 	private int MAXDOCID;
 	
-	public void setIndex(int[] index, int max){
+	IndexNode(int[] index, int max){
 		this.docFrequency = index[0];
 		
 		this.docIDs = new int[this.docFrequency];
@@ -359,6 +395,11 @@ class BM25_URL_pair{
 	BM25_URL_pair(double BM25, String url){
 		this.BM25 = BM25;
 		this.url = url;
+	}
+	
+	@Override
+	public String toString(){
+		return BM25 + " " + url;
 	}
 	
 	public double getBM25(){

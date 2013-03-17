@@ -23,7 +23,7 @@ public class MergeSortMachine {
 	//words' index cache
 	private ArrayList<WordIndex> finalWordsIndex;
 	//global index of each word index' begin position in final index file
-	private int posCount;
+	private long posCount;
 	
 	MergeSortMachine(){
 		//generate heap using intermediate blocks
@@ -94,14 +94,17 @@ public class MergeSortMachine {
 			BufferedWriter outBeginEndOfWordInIndex = 
 					new BufferedWriter(new FileWriter("beginEndOfWordInIndex", true), BUFFERSIZE);
 			
-			//write [WordID, [DocIDs], [Frequencies], [Positions], [Contexts]]
+			//write [[DocIDs], [Frequencies], [Positions], [Contexts]]
 			for(WordIndex wordIndex: finalWordsIndex){
-				int beginPosCount = posCount;
+				long beginPosCount = posCount;
+				byte[] out;
 				
+				/*
 				//output compressed wordID(int)
-				byte[] out = getCompressedBytes(wordIndex.getWordID());
+				out = getCompressedBytes(wordIndex.getWordID());
 				outIndex.write(out);
 				posCount += out.length;
+				*/
 				
 				//output compressed docIDs(ints)
 				int lastInt = 0;
