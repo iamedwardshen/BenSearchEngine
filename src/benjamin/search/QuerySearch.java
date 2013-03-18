@@ -50,7 +50,7 @@ public class QuerySearch {
 		if(number < 0) number = 0;
 		
 		//use heap to get top 10 BM25
-		PriorityQueue<BM25_URL_pair> heap= new PriorityQueue<>((number == 0? 1 : number),
+		PriorityQueue<BM25_URL_pair> heap= new PriorityQueue<>((number == 0? 1 : number + 1),
 				new Comparator<BM25_URL_pair>(){
 			public int compare(BM25_URL_pair a, BM25_URL_pair b){
 				return Double.valueOf(a.getBM25()).compareTo(Double.valueOf(b.getBM25()));
@@ -105,8 +105,8 @@ public class QuerySearch {
 					BM25Sum += log * ((k1 + 1) * Fdt[i]) / (k + Fdt[i]);
 				}
 				
-				if(number != 0 && heap.size() >= number) heap.poll();
 				heap.offer(new BM25_URL_pair(BM25Sum, docIDToUrl.get(currentDocID)));
+				if(number != 0 && heap.size() > number) heap.poll();
 				
 				currentDocID++;
 			}
