@@ -44,4 +44,5 @@ use var-byte compression to generate index file(in IndexGenerator.java)
 ##benjamin.search##
 
 ###1. find index from index file###
-	IndexFinder.java: give a word and it will return reversed index of that word
+Using Document At A Time Query Processing and BM25.
+	IndexFinder.java: give queries and it will return the top K BM25 pages for that queries.
