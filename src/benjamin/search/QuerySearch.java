@@ -168,7 +168,7 @@ public class QuerySearch {
 	}
 	
 	//read and return:
-	//[docFrequency, wordID, docIDs, frequencies, positions, contexts]
+	//[docFrequency, docIDs, frequencies, positions, contexts]
 	private ArrayList<Integer> getAllInfoOfWordIndex(String word){
 		if(!beginEndOfwordInIndex.containsKey(word)) return null;
 		ArrayList<Integer> result = new ArrayList<>();
@@ -193,7 +193,6 @@ public class QuerySearch {
 		
 		//build ReadBuff
 		ReadBuff readBuff = new ReadBuff(buf);
-		
 		
 		//get docIDs
 		int lastInt = 0;
